@@ -146,8 +146,34 @@ namespace FF34Manip
             return time;
         }
 
+        private void SetAndRevertTime(Manip targetManip)
+        {
+            SetTime(targetManip);
+            // Continuously set time until game is launched or app is unfocused
+            try
+            {
+                while (!GameRunning() && Application.Current.MainWindow.IsActive)
+                {
+                    SetTime(targetManip);
+                }
+                // Small buffer to allow the game to launch before reverting
+                Stopwatch buffer = Stopwatch.StartNew();
+                while (buffer.Elapsed < TimeSpan.FromSeconds(3))
+                {
+                    SetTime(targetManip);
+                }
+                RevertTime();
+            }
+            catch
+            {
+                // Fix  time on crash, particularly common when a manip is active
+                RevertTime();
+            }
+        }
+
         private void SetTime(Manip targetManip)
         {
+            Thread.Sleep(40);
             using (Process SetTimeProcess = new Process
                    {
                        StartInfo = new ProcessStartInfo
@@ -168,25 +194,6 @@ namespace FF34Manip
                 SetTimeProcess.WaitForExit();
                 SetTimeProcess.Close();
             }
-            
-            // Continuously set time until either game is launched or the app is closed
-            try
-            {
-                if (!GameRunning() && Application.Current.MainWindow.IsActive)
-                {
-                    Thread.Sleep(40);
-                    SetTime(targetManip);
-                }
-                else
-                {
-                    RevertTime();
-                }
-            }
-            catch
-            {
-                // Fix  time on crash, particularly common when a manip is active
-                RevertTime();
-            }
         }
 
         private void SetDateTime(Manip targetManip)
@@ -197,13 +204,11 @@ namespace FF34Manip
             }
             
             SetDate(targetManip);
-            SetTime(targetManip);
+            SetAndRevertTime(targetManip);
         }
         
         private void RevertTime()
         {
-            // Small buffer to allow the game to launch before reverting
-            Thread.Sleep(2000);
             // Revert Time zone
             using(Process timeZoneRevertProcess = new Process
                   {
