@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
-using System.Runtime.InteropServices.JavaScript;
 using System.Threading;
-using System.Windows;
 
 namespace FF34Manip
 {
@@ -29,7 +27,22 @@ namespace FF34Manip
             public const string CEST = "W. Europe Standard Time";
             // Add more as needed - string needs to match output from tzutil.exe /l
         }
-        
+
+        // Turns a shorthand from manips.txt into a Windows time zone ID.
+        // Anything unrecognised is passed through as an ID in its own right.
+        public static string ResolveTimeZone(string name)
+        {
+            switch (name.Trim().ToUpperInvariant())
+            {
+                case "ET": return TimeZones.ET;
+                case "UTC": return TimeZones.UTC;
+                case "JST": return TimeZones.JST;
+                case "GMT": return TimeZones.GMT;
+                case "CEST": return TimeZones.CEST;
+                default: return name.Trim();
+            }
+        }
+
         private DateFormats GetDateFormat()
         {
             string datePattern = MainWindow.systemDateFormat;
@@ -50,14 +63,13 @@ namespace FF34Manip
             return Process.GetProcessesByName("FF3_Win32").Length > 0 || Process.GetProcessesByName("FF4").Length > 0;
         }
 
-        public void ExecuteManip(ManipList.ManipNames name)
+        public void ExecuteManip(Manip targetManip)
         {
             savedTimeZone = TimeZoneInfo.Local.StandardName;
 
-            ManipList manipList = new ManipList();
             timeAdjustedForOffset = false;
             currentDate = "";
-            SetDateTime(manipList.GetManipByValue(name));
+            SetDateTime(targetManip);
         }
 
         private void SetTimeZone(string targetTimeZone)
@@ -146,21 +158,46 @@ namespace FF34Manip
             return time;
         }
 
+        // How long to hold the manip time while waiting for the game to launch.
+        // Also the escape hatch - without it the loop below never ends on its own.
+        private const int WaitForGameSeconds = 10;
+
         private void SetAndRevertTime(Manip targetManip)
         {
             SetTime(targetManip);
-            // Continuously set time until game is launched or app is unfocused
+            // Hold the time until the game launches, or until we run out of patience.
+            // Deliberately does not stop when the app loses focus - pressing Play on the
+            // launcher unfocuses it, which is exactly when the time still needs holding.
             try
             {
-                while (!GameRunning() && Application.Current.MainWindow.IsActive)
+                Stopwatch giveUp = Stopwatch.StartNew();
+                TimeSpan limit = TimeSpan.FromSeconds(WaitForGameSeconds);
+                int shownSeconds = -1;
+
+                while (!GameRunning() && giveUp.Elapsed < limit)
                 {
+                    // Only repaint when the number actually changes - the loop is timing sensitive
+                    int secondsLeft = (int)Math.Ceiling((limit - giveUp.Elapsed).TotalSeconds);
+                    if (secondsLeft != shownSeconds)
+                    {
+                        shownSeconds = secondsLeft;
+                        MainWindow.ShowManipStatus($"Waiting for game... {secondsLeft}");
+                    }
                     SetTime(targetManip);
                 }
-                // Small buffer to allow the game to launch before reverting
-                Stopwatch buffer = Stopwatch.StartNew();
-                while (buffer.Elapsed < TimeSpan.FromSeconds(3))
+
+                bool gaveUp = giveUp.Elapsed >= limit;
+                MainWindow.ShowManipStatus(gaveUp ? "Gave up - resyncing..." : "Game started - resyncing...");
+
+                // Small buffer to allow the game to launch before reverting.
+                // Pointless if we gave up, since nothing is launching.
+                if (!gaveUp)
                 {
-                    SetTime(targetManip);
+                    Stopwatch buffer = Stopwatch.StartNew();
+                    while (buffer.Elapsed < TimeSpan.FromSeconds(3))
+                    {
+                        SetTime(targetManip);
+                    }
                 }
                 RevertTime();
             }
@@ -168,6 +205,10 @@ namespace FF34Manip
             {
                 // Fix  time on crash, particularly common when a manip is active
                 RevertTime();
+            }
+            finally
+            {
+                MainWindow.ShowManipStatus("");
             }
         }
 

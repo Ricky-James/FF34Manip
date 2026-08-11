@@ -1,17 +1,18 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 
 namespace FF34Manip
 {
     public partial class MainWindow : Window
     {
-        public static string AppVersion => $"Version 1.5 - 2025-07-01";
+        public static string AppVersion => $"Version 2.0 - 2026-08-11";
         public ManipController ManipController = new ManipController();
+        public ManipList Manips { get; } = new ManipList();
         public static string systemDateFormat;
         public static short timeOffset = 0;
 
@@ -19,7 +20,36 @@ namespace FF34Manip
         {
             InitializeComponent();
             systemDateFormat = CultureInfo.CurrentCulture.DateTimeFormat.ShortDatePattern;
+            ReportManipFileErrors();
             InitializeTimeService();
+        }
+
+        // Bad lines are skipped rather than fixed, so tell the user which ones were ignored
+        private void ReportManipFileErrors()
+        {
+            if (Manips.Errors.Count == 0)
+            {
+                return;
+            }
+
+            // The file couldn't be opened at all - that message explains itself
+            if (Manips.FileUnavailable)
+            {
+                MessageBox.Show(Manips.Errors[0], ManipList.FileName, MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            string intro = Manips.Errors.Count == 1
+                ? $"1 line in {ManipList.FileName} didn't make sense, so it was skipped."
+                : $"{Manips.Errors.Count} lines in {ManipList.FileName} didn't make sense, so they were skipped.";
+
+            MessageBox.Show(
+                $"{intro}\nEvery other manip still works as normal.\n\n" +
+                $"{string.Join("\n\n", Manips.Errors)}\n\n" +
+                "That is: name, time zone, day, month, year, hour, minute, second.\n\n",
+                ManipList.FileName,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
         }
 
         // Verify time service is active to enable /resync
@@ -44,62 +74,36 @@ namespace FF34Manip
             }
         }
 
+        // Forcing a repaint below lets clicks through, so ignore any that land mid-manip
+        private bool manipRunning;
+
         private void StartManip(object sender, RoutedEventArgs args)
         {
-            Dictionary<string, ManipList.ManipNames> inputToManipMap = new Dictionary<string, ManipList.ManipNames>
+            // Each button is generated from a manips.txt entry, which it carries as its DataContext
+            if (manipRunning || args.Source is not Button { DataContext: Manip manip })
             {
-                // FF3
-                { "Altar Cave", ManipList.ManipNames.AltarCave },
-                { "Sealed Cave", ManipList.ManipNames.SealedCave},
-                { "Dragon's Peak", ManipList.ManipNames.DragonsPeak},
-                { "Tozus Tunnel", ManipList.ManipNames.TozusTunnel},
-                { "To Tower of Owen", ManipList.ManipNames.ToTowerOfOwen},
-                { "Tower of Owen", ManipList.ManipNames.TowenOfOwen},
-                { "Subterranean Lake", ManipList.ManipNames.SubterraneanLake},
-                { "Molten Cave", ManipList.ManipNames.MoltenCave},
-                { "Hein's Castle", ManipList.ManipNames.HeinCastle},
-                { "Cave of Tides", ManipList.ManipNames.CaveOfTides},
-                { "Amur Sewers", ManipList.ManipNames.Sewers},
-                { "Chocobo's Wrath", ManipList.ManipNames.ChocoboWrath },
-                { "Goldor Manor", ManipList.ManipNames.GoldorManor },
-                { "Garuda", ManipList.ManipNames.Garuda },
-                { "Cave of the Circle", ManipList.ManipNames.CaveOfTheCircle },
-                { "Saronia Catacombs", ManipList.ManipNames.SaroniaCatacombs },
-                { "Ancients' Maze", ManipList.ManipNames.AncientsMaze },
-                { "Cave of Shadows", ManipList.ManipNames.CaveOfShadows },
-                { "Shining Curtain", ManipList.ManipNames.ShiningCurtain },
-                { "Doga's Grotto", ManipList.ManipNames.DogasGrotto },
-                { "To Xande", ManipList.ManipNames.ToXande },
-                { "World of Darkness", ManipList.ManipNames.WorldOfDarkness },
-                { "Cloud of Darkness", ManipList.ManipNames.CloudOfDarkness },
-                
-                // FF4
-                { "New Game", ManipList.ManipNames.NewGame },
-                { "Octomammoth", ManipList.ManipNames.Octomammoth },
-                { "Mysidia/Ordeals", ManipList.ManipNames.MysidiaOrdeals },
-                { "Rainbow Pudding", ManipList.ManipNames.RainbowPudding },
-                { "Underworld", ManipList.ManipNames.Underworld },
-                { "Lugae", ManipList.ManipNames.Lugae },
-                { "Babil/Rubi", ManipList.ManipNames.BabilRubi },
-                { "Sealed Cave FF4", ManipList.ManipNames.SealedCaveFF4 },
-                { "Safe Travel", ManipList.ManipNames.SafeTravel },
-                { "Dragon One Cycle", ManipList.ManipNames.DragonOneCycle },
-                { "Pink Tail", ManipList.ManipNames.PinkTail },
-                
-                
-                
-
-            };
-            
-            string? buttonText = (args.Source as Button).Content.ToString(); // Text on the button
-            
-            if (inputToManipMap.ContainsKey(buttonText))
-            { 
-                ManipController.ExecuteManip(inputToManipMap[buttonText]);
+                return;
             }
-            else
+
+            manipRunning = true;
+            try
             {
-                throw new NotSupportedException(sender + " not a recognised or implemented manip");
+                ManipController.ExecuteManip(manip);
+            }
+            finally
+            {
+                manipRunning = false;
+            }
+        }
+
+        // The manip loop runs on the UI thread and blocks it, so the countdown would never
+        // appear on its own. Setting the text then pumping at Render priority forces it to draw.
+        public static void ShowManipStatus(string text)
+        {
+            if (Application.Current?.MainWindow is MainWindow window)
+            {
+                window.manipStatus.Text = text;
+                window.Dispatcher.Invoke(() => { }, DispatcherPriority.Render);
             }
         }
 

@@ -5,7 +5,9 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:FF34Manip"
         mc:Ignorable="d"
-        Title="FF34Manip" Height="700" Width="200">
+        Title="FF34Manip" Width="200"
+        SizeToContent="Height" MinHeight="700"
+        MaxHeight="{x:Static SystemParameters.MaximizedPrimaryScreenHeight}">
     
     <!--Tab background colour styling-->
     <Window.Resources>
@@ -19,81 +21,60 @@
                 </DataTrigger>
             </Style.Triggers>
         </Style>
+        
+        <DataTemplate x:Key="ManipButtonTemplate">
+            <Button Width="150" Margin="0,5,0,0" Content="{Binding Name}" Click="StartManip"/>
+        </DataTemplate>
     </Window.Resources>
     
     <Grid>
-        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Top">
-            <StackPanel.Resources>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        
+        <Grid Grid.Row="0" HorizontalAlignment="Center">
+            <Grid.Resources>
                 <Style TargetType="{x:Type Button}">
                     <Setter Property="Margin" Value="0,5,0,0"/>
-                    <!-- TODO: update with some click style to indicate active manip-
-                    <Style.Triggers>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter Property="Foreground" Value="Green"/>
-                        </Trigger>
-                    </Style.Triggers>
-                    -->
                 </Style>
-            </StackPanel.Resources>
+            </Grid.Resources>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
 
             <!-- Dock panel for Offset settings -->
-            <DockPanel HorizontalAlignment="Left">
+            <DockPanel Grid.Row="0" HorizontalAlignment="Left">
                 <Label Content="Offset (seconds):"/>
                 <TextBox x:Name="integerTextBox" Width="25" Margin="10 0 0 0"
                          TextAlignment="Center"
                          VerticalAlignment="Center"
                          PreviewTextInput="Offset_PreviewTextInput"
-                         PreviewKeyDown="Offset_PreviewKeyDown" 
+                         PreviewKeyDown="Offset_PreviewKeyDown"
                          Text=""/>
             </DockPanel>
-        
-            <TabControl x:Name="tabControl" TabStripPlacement="Top" HorizontalContentAlignment="Stretch" Style="{StaticResource TabControlStyle}">
-                <TabItem Header="FF3" Width="50">
-                    <StackPanel>
-                        <Button Width="150" Click="StartManip">Altar Cave</Button>
-                        <Button Width="150" Click="StartManip">Sealed Cave</Button>
-                        <Button Width="150" Click="StartManip">Dragon's Peak</Button>
-                        <Button Width="150" Click="StartManip">Tozus Tunnel</Button>
-                        <Button Width="150" Click="StartManip">To Tower of Owen</Button>
-                        <Button Width="150" Click="StartManip">Tower of Owen</Button>
-                        <Button Width="150" Click="StartManip">Subterranean Lake</Button>
-                        <Button Width="150" Click="StartManip">Molten Cave</Button>
-                        <Button Width="150" Click="StartManip">Hein's Castle</Button>
-                        <Button Width="150" Click="StartManip">Cave of Tides</Button>
-                        <Button Width="150" Click="StartManip">Amur Sewers</Button>
-                        <Button Width="150" Click="StartManip">Chocobo's Wrath</Button>
-                        <Button Width="150" Click="StartManip">Goldor Manor</Button>
-                        <Button Width="150" Click="StartManip">Garuda</Button>
-                        <Button Width="150" Click="StartManip">Cave of the Circle</Button>
-                        <Button Width="150" Click="StartManip">Saronia Catacombs</Button>
-                        <Button Width="150" Click="StartManip">Ancients' Maze</Button>
-                        <Button Width="150" Click="StartManip">Cave of Shadows</Button>
-                        <Button Width="150" Click="StartManip">Shining Curtain</Button>
-                        <Button Width="150" Click="StartManip">Doga's Grotto</Button>
-                        <Button Width="150" Click="StartManip">To Xande</Button>
-                        <Button Width="150" Click="StartManip">World of Darkness</Button>
-                        <Button Width="150" Click="StartManip">Cloud of Darkness</Button>
 
-                    </StackPanel>
+            <TextBlock Grid.Row="1" x:Name="manipStatus" Height="18" Margin="0,2,0,0"
+                       TextAlignment="Center" FontWeight="Bold" Foreground="#b00000" Text=""/>
+
+            <TabControl Grid.Row="2" x:Name="tabControl" TabStripPlacement="Top" HorizontalContentAlignment="Stretch" Style="{StaticResource TabControlStyle}">
+                <TabItem Header="FF3" Width="50">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Manips.FF3, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"
+                                      ItemTemplate="{StaticResource ManipButtonTemplate}"/>
+                    </ScrollViewer>
                 </TabItem>
 
                 <TabItem Header="FF4" Width="50">
-                    <StackPanel>
-                        <Button Width="150" Click="StartManip">New Game</Button>
-                        <Button Width="150" Click="StartManip">Octomammoth</Button>
-                        <Button Width="150" Click="StartManip">Mysidia/Ordeals</Button>
-                        <Button Width="150" Click="StartManip">Rainbow Pudding</Button>
-                        <Button Width="150" Click="StartManip">Underworld</Button>
-                        <Button Width="150" Click="StartManip">Lugae</Button>
-                        <Button Width="150" Click="StartManip">Babil/Rubi</Button>
-                        <Button Width="150" Click="StartManip">Sealed Cave FF4</Button>
-                        <Button Width="150" Click="StartManip">Safe Travel</Button>
-                        <Button Width="150" Click="StartManip">Dragon One Cycle</Button>
-                        <Button Width="150" Click="StartManip">Pink Tail</Button>
-                    </StackPanel>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding Manips.FF4, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}"
+                                      ItemTemplate="{StaticResource ManipButtonTemplate}"/>
+                    </ScrollViewer>
                 </TabItem>
             </TabControl>
-        </StackPanel>
-        <Label Content="{Binding AppVersion, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" HorizontalAlignment="Right" VerticalAlignment="Bottom"></Label>
+        </Grid>
+        <Label Grid.Row="1" Content="{Binding AppVersion, RelativeSource={RelativeSource FindAncestor, AncestorType={x:Type local:MainWindow}}}" HorizontalAlignment="Right" VerticalAlignment="Bottom"></Label>
     </Grid>
 </Window>
